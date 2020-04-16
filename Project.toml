@@ -1,0 +1,4 @@
+name = "FindPDE"
+uuid = "3e0cd23a-f1a8-4163-9a0f-a74d8db2c91f"
+authors = ["Graham Smith <grahamas@gmail.com>"]
+version = "0.1.0"
