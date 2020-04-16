@@ -38,12 +38,13 @@ function multinomial_recombination(data::AbstractMatrix{T}, data_description, P:
     l_powers = multinomial_powers(n_vars, P) # don't power constant column
     n_powers = length(powers)
     multinomials = Matrix{T}(len_vars, n_powers)
+    multinomials_description = Vector{AbstractDescription}(undef, n_powers)
     for (i_power, powers) in enumerate(l_powers)
         multinomials[i_power,:] = multinomial.(data, powers')
+        multinomials_description[i_power] = multinomial(data_description, powers)
     end
 
-    # TODO: handle column descriptions
-    return Θ, nothing
+    return Θ, multinomials_description
 end
 
 

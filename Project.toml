@@ -2,3 +2,6 @@ name = "FindPDE"
 uuid = "3e0cd23a-f1a8-4163-9a0f-a74d8db2c91f"
 authors = ["Graham Smith <grahamas@gmail.com>"]
 version = "0.1.0"
+
+[deps]
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"

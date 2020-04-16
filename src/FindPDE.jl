@@ -1,7 +1,10 @@
 module FindPDE
 
+using LaTeXStrings
+
 include("differencing.jl")
 include("multinomials.jl")
+include("descriptions.jl")
 
 function build_linear_system(arr_frames::U, dt, dx, derivative_order, polynomial_order) where
     {T, SpaceArr<:AbstractVector{T}, U<:AbstractVector{SpaceArr}}
@@ -19,18 +22,22 @@ function build_linear_system(arr_frames::U, dt, dx, derivative_order, polynomial
     n_space_derivatives = derivative_order + 1
     space_derivatives = Matrix{T}(undef, prod(size(matrix_u)), n_space_derivatives) 
 
-    all_derivatives[:,1] = matrix_u[:]
+    space_derivatives[:,1] = matrix_u[:]
+    base_desc = AtomicDescription("u")
+    space_derivatives_desc[1] = base_desc
 
     time_derivative_order = 1
     time_derivative_approximation_order = 2
     u_t = finite_diff(matrix_u, dt, TIME_DIM, time_derivative_order, 
                       time_derivative_approximation_order)[:]
+    u_t_desc = differentiate(base_desc, :t)
 
     for order in 1:derivative_order
-        all_derivatives[:,order+2] = finite_diff(matrix_u, dx, SPACE_DIM, order)
+        space_derivatives[:,order+1] = finite_diff(matrix_u, dx, SPACE_DIM, order)
+        space_derivatives_desc[order+1] = differentiate(base_desc, :x, order)
     end
    
-    Φ, desc =  multinomial_recombination(all_derivatives, nothing, polynomial_order) 
+    Φ, Φ_desc =  multinomial_recombination(all_derivatives, space_derivatives_desc, polynomial_order) 
 end
 
 
