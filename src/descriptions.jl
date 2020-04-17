@@ -13,8 +13,19 @@ end
 function Base.:(^)(left::AbstractDescription, right::Int)
     ExponentiatedDescription(left, right)
 end
-Base.show(io::IO, desc::ExponentiatedDescription) = print(io, latexstring("\\left($(desc.base)\\right)^{$(desc.exponent)}"))
-
+function Base.show(io::IO, desc::ExponentiatedDescription)
+    if string(desc.base) == "0"
+        print(io, LaTeXString("0"))
+    elseif desc.exponent == 0
+        print(io, LaTeXString("1"))
+    elseif desc.exponent == 1
+        print(io, LaTeXString("$(desc.base)"))
+    elseif length(string(desc.base)) == 1
+        print(io, LaTeXString("$(desc.base)^{$(desc.exponent)}"))
+    else
+        print(io, LaTeXString("\\left($(desc.base)\\right)^{$(desc.exponent)}"))
+    end
+end
 ### Products
 struct DescriptionProduct <: AbstractDescription
     multiplicands::Vector{<:AbstractDescription}
@@ -29,8 +40,13 @@ function Base.:(*)(left::AbstractDescription, right::DescriptionProduct)
     DescriptionProduct([left, right.multiplicands...])
 end
 Base.:(*)(left::AbstractDescription, right::AbstractDescription) = DescriptionProduct([left, right])
-Base.show(io::IO, desc::DescriptionProduct) = print(io, latexstring("$(desc.multiplicands...)"))
-
+function Base.show(io::IO, desc::DescriptionProduct)
+    if any(string.(desc.multiplicands) .== "0")
+        print(io, LaTeXString("0"))
+    else
+        print(io, LaTeXString("$([mult for mult in desc.multiplicands if string(mult) != "1"]...)"))
+    end
+end
 ### Derivatives
 struct DerivativeDescription{D} <: AbstractDescription
     base::D
@@ -47,6 +63,6 @@ function differentiate(desc::DerivativeDescription, sym::Symbol, order=1)
 end
 differentiate(desc::AbstractDescription, sym::Symbol, order=1) = DerivativeDescription(desc, Dict(sym => order))
 function Base.show(io::IO, desc::DerivativeDescription)
-    derivative_strs = ["D_{$(key)}^{$(val)}" for (key, val) in pairs(desc.derivatives)]
-    print(io, latexstring("$(derivative_strs...)$(desc.base)"))
+    derivative_strs = [(val != 1 ? "D_{$(key)}^{$(val)}" : "D_{$(key)}") for (key, val) in pairs(desc.derivatives)]
+    print(io, LaTeXString("$(derivative_strs...)$(desc.base)"))
 end
