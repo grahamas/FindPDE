@@ -1,4 +1,14 @@
 
+# FIXME doesn't account for things like complex or float32
+function iszero(ad::AbstractDescription)
+    sad = string(ad)
+    sad == "0" || sad == "0.0"
+end
+function isone(ad::AbstractDescription)
+    sad = string(ad)
+    sad == "0" || sad == "0.0"
+end
+
 abstract type AbstractDescription end
 
 struct AtomicDescription <: AbstractDescription
@@ -14,7 +24,7 @@ function Base.:(^)(left::AbstractDescription, right::Int)
     ExponentiatedDescription(left, right)
 end
 function Base.show(io::IO, desc::ExponentiatedDescription)
-    if string(desc.base) == "0"
+    if iszero(desc.base)
         print(io, LaTeXString("0"))
     elseif desc.exponent == 0
         print(io, LaTeXString("1"))
@@ -26,6 +36,9 @@ function Base.show(io::IO, desc::ExponentiatedDescription)
         print(io, LaTeXString("\\left($(desc.base)\\right)^{$(desc.exponent)}"))
     end
 end
+
+
+
 ### Products
 struct DescriptionProduct <: AbstractDescription
     multiplicands::Vector{<:AbstractDescription}
@@ -39,14 +52,41 @@ end
 function Base.:(*)(left::AbstractDescription, right::DescriptionProduct)
     DescriptionProduct([left, right.multiplicands...])
 end
+Base.:(*)(left, right::AbstractDescription) = DescriptionProduct([AtomicDescription(string(left)), right])
+Base.:(*)(left::AbstractDescription, right) = DescriptionProduct([left, AtomicDescription(string(right))])
 Base.:(*)(left::AbstractDescription, right::AbstractDescription) = DescriptionProduct([left, right])
+
 function Base.show(io::IO, desc::DescriptionProduct)
-    if any(string.(desc.multiplicands) .== "0")
+    if any(iszero.(desc.multiplicands))
         print(io, LaTeXString("0"))
     else
-        print(io, LaTeXString("$([mult for mult in desc.multiplicands if string(mult) != "1"]...)"))
+        print(io, LaTeXString("$([mult for mult in desc.multiplicands if !isone(mult)]...)"))
     end
 end
+
+
+### Sums
+struct DescriptionSum <: AbstractDescription
+    addends::Vector{<:AbstractDescription}
+end
+function Base.:(+)(left::DescriptionSum, right::DescriptionSum)
+    DescriptionSum([left.addends..., right.addends...])
+end
+function Base.:(+)(left::DescriptionSum, right::AbstractDescription)
+    DescriptionSum([left.addends..., right])
+end
+function Base.:(+)(left::AbstractDescription, right::DescriptionSum)
+    DescriptionSum([left, right.addends...])
+end
+Base.:(+)(left, right::AbstractDescription) = DescriptionSum([AtomicDescription(string(left)), right])
+Base.:(+)(left::AbstractDescription, right) = DescriptionSum([left, AtomicDescription(string(right))])
+Base.:(+)(left::AbstractDescription, right::AbstractDescription) = DescriptionSum([left, right])
+
+function Base.show(io::IO, desc::DescriptionSum)
+    print(io, LaTeXString("$([addend for addend in desc.addends if !iszero(addend)]...)"))
+end
+
+
 ### Derivatives
 struct DerivativeDescription{D} <: AbstractDescription
     base::D

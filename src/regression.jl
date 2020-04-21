@@ -10,23 +10,6 @@ function lstsq(A,b)
     qr(A) \ b
 end
 
-function train_ElasticNet(Φ, λ, d_tol, maxit=25, STR_iters=10, 
-                          l0_penalty=0.001*cond(convert(Matrix,Φ)), normalize=2, 
-                          split=0.8, print_best_tol=false)
-    n_obs, n_vars = size(Φ)
-    d_name = differentiate(AtomicDescription("u"), :t)
-    @show d_name
-    y, X = unpack(Φ, ==(Symbol(d_name)), colname -> true)
-    train, test = partition(eachindex(y), split, shuffle=true)
-
-    tol = d_tol
-
-    net = machine(elastic_net, X, y)
-    fit!(net, rows=train)
-    
-    return net
-end
-
 function STRidge(X, y, λ, maxit, tol, normalize=2)
     n_obs, n_vars = size(X)
     # TODO: move w_ridge out of this repeat
@@ -71,20 +54,17 @@ function STRidge(X, y, λ, maxit, tol, normalize=2)
     if big_idxs != [] # How would big_idxs == [] be possible?
         w[big_idxs] .= lstsq(X[:, big_idxs], y)
     end
-    @show sum(big_idxs)
     
     return w
 end
         
 
 # FIXME: should be cond Φ[:,Not(:u_t)]
-function train_STRidge(Φ, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.001*cond(convert(Matrix,Φ)), normalize=2, split=0.8, print_best_tol=true)
+# R should have constant column
+function train_STRidge(X, Ut, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.001*cond(convert(Matrix,X)), p_norm=2, split=0.8, print_best_tol=false)
     # TODO set seed
     
-    Φ[!,:C] .= 1.0
-    n_obs, n_vars = size(Φ)
-    d_time_desc = differentiate(AtomicDescription("u"), :t) |> Symbol
-    Ut, X = unpack(Φ, ==(d_time_desc), colname -> true) 
+    n_obs, n_vars = size(X)
     train, test = partition(eachindex(Ut), split, shuffle=false)
     X_train, X_test = convert.(Matrix, (X[train,:], X[test, :])) # shouldn't need using MLJ
     Ut_train, Ut_test = convert.(Vector, (Ut[train], Ut[test]))
@@ -92,8 +72,8 @@ function train_STRidge(Φ, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.001*c
     tol = d_tol
     
     # TODO: test normalizing before lm fit
-    normed_X_train = if normalize != 0
-        Mreg = 1.0 ./ norm.([X_train[:,i] for i in 1:n_vars-1], normalize)
+    normed_X_train = if p_norm != 0
+        Mreg = 1.0 ./ norm.([X_train[:,i] for i in 1:n_vars], p_norm)
         X_train .* Mreg'
     else
         X_train
@@ -101,16 +81,15 @@ function train_STRidge(Φ, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.001*c
     
     w_best = lstsq(normed_X_train, Ut_train) .* Mreg
     Ut_hat = X_test * w_best
-    err_best = norm(Ut_hat .- Ut[test]) + l0_penalty*l0_loss(w_best)
+    err_best = norm(Ut_hat .- Ut_test) + l0_penalty*l0_loss(w_best)
     tol_best = 0
             
     # Increase tolerance until test performance decreases
     for iter in 1:maxit
 
         # Get a set of coefficients and error
-        w = STRidge(normed_X_train, Ut_train, λ, STR_iters, tol, normalize) .* Mreg #FIXME
-        err = norm(X_test .* w' .- Ut[test]) + l0_penalty*l0_loss(w)
-        @show err
+        w = STRidge(normed_X_train, Ut_train, λ, STR_iters, tol, p_norm) .* Mreg #FIXME
+        err = norm(X_test .* w' .- Ut_test) + l0_penalty*l0_loss(w)
         
         if err <= err_best
             err_best = err
