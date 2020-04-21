@@ -61,11 +61,11 @@ end
 
 # FIXME: should be cond Φ[:,Not(:u_t)]
 # R should have constant column
-function train_STRidge(X, Ut, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.001*cond(convert(Matrix,X)), p_norm=2, split=0.8, print_best_tol=false)
+function train_STRidge(X, Ut, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.001*cond(convert(Matrix,X)), p_norm=2, split=0.8, print_best_tol=true)
     # TODO set seed
     
     n_obs, n_vars = size(X)
-    train, test = partition(eachindex(Ut), split, shuffle=false)
+    train, test = partition(eachindex(Ut), split, shuffle=true)
     X_train, X_test = convert.(Matrix, (X[train,:], X[test, :])) # shouldn't need using MLJ
     Ut_train, Ut_test = convert.(Vector, (Ut[train], Ut[test]))
     

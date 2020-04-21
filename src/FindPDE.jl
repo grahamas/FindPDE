@@ -8,14 +8,14 @@ using Combinatorics
 using LaTeXStrings
 using PrettyPrinting
 
-export build_linear_system
+export build_linear_system, train_STRidge
 
 include("differencing.jl")
 include("multinomials.jl")
 include("descriptions.jl")
 include("regression.jl")
 
-function build_linear_system(matrix_u::Matrix{T}, dt, dx, derivative_order, polynomial_order) where
+function build_linear_system(matrix_u::Matrix{T}, dt, dx, derivative_order, polynomial_order, deriv_approx_order=2) where
     {T}
     # TODO: multidimensional space
     n_x, n_t = size(matrix_u)
@@ -29,22 +29,22 @@ function build_linear_system(matrix_u::Matrix{T}, dt, dx, derivative_order, poly
     
     # Add constant column
     space_derivatives[:,1] .= 1.0
-    constant_desc = AtomicDescription("C")
+    constant_desc = AtomicDescription(:C)
     space_derivatives_desc[1] = constant_desc
 
     # Add u (derivative order 0) column
     space_derivatives[:,2] .= matrix_u[:]
-    base_desc = AtomicDescription("u")
+    base_desc = AtomicDescription(:u)
     space_derivatives_desc[2] = base_desc
 
     time_derivative_order = 1
-    time_derivative_approximation_order = 2
-    u_t = (manual_finite_diff(matrix_u', dt, time_derivative_order, 
+    time_derivative_approximation_order = deriv_approx_order
+    u_t = (finite_diff(matrix_u', dt, time_derivative_order, 
                       time_derivative_approximation_order)')[:]
     u_t_desc = differentiate(base_desc, :t)
 
     for order in 1:derivative_order
-        space_derivatives[:,order+2] .= manual_finite_diff(matrix_u, dx, order)[:]
+        space_derivatives[:,order+2] .= finite_diff(matrix_u, dx, order, deriv_approx_order)[:]
         space_derivatives_desc[order+2] = differentiate(base_desc, :x, order)
     end
     @show sum(isnan.(space_derivatives))

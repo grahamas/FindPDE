@@ -2,8 +2,6 @@
 
 function multinomial_powers(n_variables, max_order)
     # NOTE: n_variables should NOT include constant
-    @show n_variables
-    @show max_order
     Iterators.flatten(map(1:(max_order+1)) do order
         overflow_size = n_variables + order-1
         map(combinations(0:overflow_size-1, n_variables-1)) do indices
@@ -13,7 +11,7 @@ function multinomial_powers(n_variables, max_order)
         end
     end)
 end
-function multinomial(bases, powers)
+function multinomial(bases::AbstractVector, powers::AbstractVector)
     prod(bases .^ powers)
 end
 

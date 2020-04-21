@@ -1,4 +1,9 @@
 
+abstract type AbstractDescription end
+
+
+
+### Helper functions
 # FIXME doesn't account for things like complex or float32
 function iszero(ad::AbstractDescription)
     sad = string(ad)
@@ -9,13 +14,18 @@ function isone(ad::AbstractDescription)
     sad == "0" || sad == "0.0"
 end
 
-abstract type AbstractDescription end
 
+
+### Atomics
+# Basically, symbols.
 struct AtomicDescription <: AbstractDescription
-    name::String
+    name::Symbol
 end
-Base.show(io::IO, desc::AtomicDescription) = print(io, desc.name)
-### Powers
+Base.show(io::IO, desc::AtomicDescription) = print(io, string(desc.name))
+
+
+
+### Exponents
 struct ExponentiatedDescription{D<:AbstractDescription} <: AbstractDescription
     base::D
     exponent::Int
@@ -52,8 +62,8 @@ end
 function Base.:(*)(left::AbstractDescription, right::DescriptionProduct)
     DescriptionProduct([left, right.multiplicands...])
 end
-Base.:(*)(left, right::AbstractDescription) = DescriptionProduct([AtomicDescription(string(left)), right])
-Base.:(*)(left::AbstractDescription, right) = DescriptionProduct([left, AtomicDescription(string(right))])
+Base.:(*)(left, right::AbstractDescription) = DescriptionProduct([AtomicDescription(Symbol(left)), right])
+Base.:(*)(left::AbstractDescription, right) = DescriptionProduct([left, AtomicDescription(Symbol(right))])
 Base.:(*)(left::AbstractDescription, right::AbstractDescription) = DescriptionProduct([left, right])
 
 function Base.show(io::IO, desc::DescriptionProduct)
@@ -78,8 +88,8 @@ end
 function Base.:(+)(left::AbstractDescription, right::DescriptionSum)
     DescriptionSum([left, right.addends...])
 end
-Base.:(+)(left, right::AbstractDescription) = DescriptionSum([AtomicDescription(string(left)), right])
-Base.:(+)(left::AbstractDescription, right) = DescriptionSum([left, AtomicDescription(string(right))])
+Base.:(+)(left, right::AbstractDescription) = DescriptionSum([AtomicDescription(Symbol(left)), right])
+Base.:(+)(left::AbstractDescription, right) = DescriptionSum([left, AtomicDescription(Symbol(right))])
 Base.:(+)(left::AbstractDescription, right::AbstractDescription) = DescriptionSum([left, right])
 
 function Base.show(io::IO, desc::DescriptionSum)
