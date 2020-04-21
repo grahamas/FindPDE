@@ -1,24 +1,25 @@
 module FindPDE
 
 using DiffEqOperators
-using MLDataUtils
+using DataFrames
+using MLJLinearModels, MLJ
 using LinearAlgebra
 using Combinatorics
 using LaTeXStrings
+using PrettyPrinting
 
 export build_linear_system
 
 include("differencing.jl")
 include("multinomials.jl")
 include("descriptions.jl")
+include("regression.jl")
 
-function build_linear_system(arr_frames::U, dt, dx, derivative_order, polynomial_order) where
-    {T, SpaceArr<:AbstractVector{T}, U<:AbstractVector{SpaceArr}}
+function build_linear_system(matrix_u::Matrix{T}, dt, dx, derivative_order, polynomial_order) where
+    {T}
     # TODO: multidimensional space
-    n_t = length(arr_frames)
-    n_x = length(arr_frames[1])
+    n_x, n_t = size(matrix_u)
     
-    matrix_u::Matrix{T} = hcat(arr_frames...) # FIXME: if N_SPACE > 1, need to unroll before splatting 
     SPACE_DIM = 1
     TIME_DIM = 2
 
