@@ -1,13 +1,18 @@
 
-linreg = @load LinearRegressor pkg="GLM"
-elastic_net = @load ElasticNetRegressor pkg="ScikitLearn"
+#@load ElasticNetRegressor pkg="MLJLinearModels"
 
 l0_loss(machine) = sum(fitted_params(machine).coefs .!= 0.0)
 l0_loss(vec::AbstractArray) = sum(vec .!= 0.0)
 
 # solve Ax = b
 function lstsq(A,b)
-    qr(A) \ b
+    A \ b
+end
+
+function make_l20(l0_cost)
+    function l20(y_hat, y, w)
+        norm(y_hat .- y) + l0_cost * l0_loss(w)
+    end
 end
 
 function STRidge(X, y, λ, maxit, tol, normalize=2)
@@ -62,6 +67,7 @@ end
 # FIXME: should be cond Φ[:,Not(:u_t)]
 # R should have constant column
 function train_STRidge(X, Ut, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.001*cond(convert(Matrix,X)), p_norm=2, split=0.8, print_best_tol=true)
+    l20 = make_l20(l0_penalty)
     # TODO set seed
     
     n_obs, n_vars = size(X)
@@ -81,7 +87,7 @@ function train_STRidge(X, Ut, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.00
     
     w_best = lstsq(normed_X_train, Ut_train) .* Mreg
     Ut_hat = X_test * w_best
-    err_best = norm(Ut_hat .- Ut_test) + l0_penalty*l0_loss(w_best)
+    err_best = l20(Ut_hat, Ut_test, w_best)
     tol_best = 0
             
     # Increase tolerance until test performance decreases
@@ -89,7 +95,7 @@ function train_STRidge(X, Ut, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.00
 
         # Get a set of coefficients and error
         w = STRidge(normed_X_train, Ut_train, λ, STR_iters, tol, p_norm) .* Mreg #FIXME
-        err = norm(X_test .* w' .- Ut_test) + l0_penalty*l0_loss(w)
+        err = l20(X_test .* w', Ut_test, w)
         
         if err <= err_best
             err_best = err
@@ -111,6 +117,27 @@ function train_STRidge(X, Ut, λ, d_tol, maxit=25, STR_iters=10, l0_penalty=0.00
     return w_best
 end
 
+# function train_ElasticNet(df::DataFrame, λ, d_tol,
+#                           l0_penalty=0.001*cond(convert(Matrix,X)), 
+#                           normalize=2, 
+#                           split=0.8, print_best_tol=false)
+#     ut_desc = Symbol(differentiate(AtomicDescription(:u), :t))
+#     Ut, X = unpack(df, ==(ut_desc), colname -> true)
+#     train, test = partition(eachindex(Ut), split, shuffle=true)
+
+#     elastic_net = ElasticNetRegressor(normalize=true)
+#     cv = CV(nfolds=3, shuffle=true)
+#     evaluate(elastic_net, X, Ut, resampling=cv)
+# end
+
+# function train_ElasticNet(X::AbstractMatrix, Ut, desc, λ, d_tol,
+#                           l0_penalty=0.001*cond(convert(Matrix,X)), normalize=2, 
+#                           split=0.8, print_best_tol=false)
+#     df = convert(DataFrame, hcat(Ut, X))
+#     ut_desc = differentiate(AtomicDescription(:u), :t)
+#     rename!(df, Symbol.([ut_desc, desc...]))
+#     train_ElasticNet(df, λ, d_tol, l0_penalty, normalize, split, print_best_tol)
+# end
 
 
 

@@ -2,7 +2,7 @@ module FindPDE
 
 using DiffEqOperators
 using DataFrames
-using MLJLinearModels, MLJ
+#using MLJ
 using LinearAlgebra
 using Combinatorics
 using LaTeXStrings
@@ -58,6 +58,61 @@ function build_linear_system(matrix_u::Matrix{T}, dt, dx, derivative_order, poly
 #     all_terms_df[!,:C] .= 1.0
     return u_t, space_terms, space_terms_desc
 end
+
+function build_linear_system(u::Array{T,3}, u_names::Vector{Symbol}, dt, dx, derivative_order, polynomial_order, space_deriv_approx_order=2, time_deriv_approx_order=2) where
+    {T}
+    # TODO: multidimensional space; Currently must be 1D
+    # n_x: num points of 1d space
+    # n_t: num points of time
+    # n_p: number of "populations"
+    n_x, n_t, n_p = size(u)
+    @assert length(u_names) == size(u,3)
+    u_descs = AtomicDescription.(u_names)
+
+    # Matrix where each column is a flattened derivative matrix
+    # Col 1: Constant
+    # Col 2-P+1: u[:,:,i]
+    # Cols P+1-(derivative_order+1): u1_(x...)
+    # cols (derivative_order+1)-...: u2_(y...)
+    n_space_derivatives = 1 + (derivative_order + 1) * n_p
+    space_derivatives = Matrix{T}(undef, prod(size(u)[[1,2]]), n_space_derivatives) 
+    space_derivatives_desc = Vector{AbstractDescription}(undef, n_space_derivatives)
+    time_derivatives = Matrix{T}(undef, prod(size(u)[[1,2]]), n_p)
+    time_derivatives_desc = Vector{AbstractDescription}(undef, n_p)
+    
+    # Add constant column
+    space_derivatives[:,1] .= 1.0
+    constant_desc = AtomicDescription(:C)
+    space_derivatives_desc[1] = constant_desc
+
+    # Add u (derivative order 0) column
+    time_derivative_order = 1
+    n_nonderivatives = u_p + 1
+    for i_p in 1:n_p
+        this_matrix = u[:,:,i_p]
+        space_derivatives[:,1+i_p] .= this_matrix[:]
+        space_derivatives_desc[2] = u_descs[i_p]
+        n_derivatives_so_far = derivative_order * (i_p - 1)
+        this_p_zero_idx = n_nonderivatives + n_derivatives_so_far
+        for order in 1:derivative_order
+            space_derivatives[:,order+this_p_zero_idx] .= finite_diff(this_matrix, dx, order, space_deriv_approx_order)[:]
+            space_derivatives_desc[order+this_p_zero_idx] = differentiate(u_descs[i_p], :x, order)
+        end
+        
+        time_derivatives[:, i_p] = (finite_diff(this_matrix', dt, time_derivative_order, 
+                      time_deriv_approx_order)')[:]
+        time_derivatives_desc[i_p] = differentiate(u_descs[i_p], :t)
+    end
+
+    # FIXME don't send constant
+    space_terms, space_terms_desc =  multinomial_recombination(
+        space_derivatives[:,2:end], space_derivatives_desc[2:end], 
+        polynomial_order)
+    space_terms = hcat(space_derivatives[:,1], space_terms)
+    space_terms_desc = hcat(space_derivatives_desc[1], space_terms_desc)
+    return time_derivatives, time_derivatives_desc, space_terms, space_terms_desc
+end
+
 
 
 end # module
